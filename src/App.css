@@ -1,3 +1,4 @@
+@import "tailwindcss";
 .App {
   text-align: center;
 }
@@ -6,12 +7,15 @@
   height: 40vmin;
   pointer-events: none;
 }
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {
     animation: App-logo-spin infinite 20s linear;
   }
 }
+@import "tailwindcss";
 
 .App-header {
   background-color: #282c34;
