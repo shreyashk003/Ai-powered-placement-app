@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { Book, Check, ChevronDown, Clock, Award, X } from "lucide-react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
+function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
+  const navigate = useNavigate();
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [completedTests, setCompletedTests] = useState([]);
+  const [attemptsCount, setAttemptsCount] = useState({});
   const [quizActive, setQuizActive] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [timer, setTimer] = useState(900); // 15 minutes
   const [currentPage, setCurrentPage] = useState(1);
   const [startTime, setStartTime] = useState(null);
+  const [attemptNumber, setAttemptNumber] = useState(1);
+  const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const questionsPerPage = 5;
-  //const [techStatus, setTechnicalStatus] = useState(false);
+  const MAX_ATTEMPTS = 3; // Maximum number of attempts allowed
 
   const subjectsList = {
     cs: [
@@ -55,22 +60,127 @@ function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
   const stdBranch = loginName && loginName.length === 10 ? loginName.substring(5, 7).toLowerCase() : "cs";
   const subjects = subjectsList[stdBranch] || [];
 
-  // Fetch completed tests
+  // Load all subject attempt data on mount
   useEffect(() => {
-    const fetchCompletedTests = async () => {
-      try {
-        const response = await axios.get(`http://localhost:8080/api/getUserCompletedTests/${usn}`);
-        setCompletedTests(response.data.map(test => test.sub_name));
-      } catch (error) {
-        console.error("Error fetching completed tests:", error);
-        // For testing
-        // setCompletedTests(["PS", "OS"]);
-      }
-    };
-    fetchCompletedTests();
+    if (usn) {
+      loadAllSubjectAttempts();
+    }
   }, [usn]);
+  
+  // New function to load all subject attempt data at once
+  const loadAllSubjectAttempts = async () => {
+    try {
+      const response = await axios.get(`http://localhost:8080/api/getUserCompletedTests/${usn}`);
+      console.log("Loading all subject attempts:", response.data);
+      
+      // Process the response to extract completed tests and attempt counts
+      const completed = [];
+      const attempts = {};
+      
+      if (Array.isArray(response.data)) {
+        // Group attempts by subject
+        const subjectAttempts = {};
+        
+        response.data.forEach(test => {
+          if (!subjectAttempts[test.sub_name]) {
+            subjectAttempts[test.sub_name] = [];
+          }
+          subjectAttempts[test.sub_name].push(test.attempt_no);
+          
+          // Mark subject as completed if at least one attempt exists
+          if (!completed.includes(test.sub_name)) {
+            completed.push(test.sub_name);
+          }
+        });
+        
+        // Find maximum attempt number for each subject
+        Object.keys(subjectAttempts).forEach(subject => {
+          attempts[subject] = Math.max(...subjectAttempts[subject]);
+        });
+      }
+      
+      console.log("Processed completed tests:", completed);
+      console.log("Processed attempts count:", attempts);
+      
+      setCompletedTests(completed);
+      setAttemptsCount(attempts);
+      
+      // Check if technical section is completed (5+ subjects completed)
+      if (completed.length >= 5) {
+        setTechnicalStatus(true);
+      }
+    } catch (error) {
+      console.error("Error loading subject attempts:", error);
+    }
+  };
 
-  const handleStartQuiz = (subject) => {
+  // Check attempts for a specific subject before starting quiz
+  const checkAttempts = async (subjectCode) => {
+    try {
+      // Create the request payload
+      const payload = {
+        usn: usn,
+        sub_name: subjectCode
+      };
+      
+      // Send the POST request with the payload
+      const response = await axios.post("http://localhost:8080/api/getTechAttempt_no", payload);
+      
+      console.log(`Checking attempts for user: ${usn} for subject: ${subjectCode}`);
+      console.log("Attempts data:", response.data);
+      
+      if (response.data && response.data.length > 0) {
+        // Filter for only the specific subject attempts
+        const subjectAttempts = response.data.filter(
+          attempt => attempt.sub_name === subjectCode
+        );
+        
+        if (subjectAttempts.length > 0) {
+          // Find the highest attempt number
+          const highestAttempt = Math.max(
+            ...subjectAttempts.map(attempt => attempt.attempt_no)
+          );
+          
+          // Update the attempts count in state
+          setAttemptsCount(prev => ({
+            ...prev,
+            [subjectCode]: highestAttempt
+          }));
+          
+          if (highestAttempt >= MAX_ATTEMPTS) {
+            setMaxAttemptsReached(true);
+            alert(`You have already reached the maximum of ${MAX_ATTEMPTS} attempts for this assessment.`);
+            return false;
+          } else {
+            setAttemptNumber(highestAttempt + 1);
+            console.log(`Set attempt number to ${highestAttempt + 1}`);
+            return true;
+          }
+        } else {
+          // No previous attempts for this subject
+          setAttemptNumber(1);
+          console.log("No previous attempts found, setting attempt to 1");
+          return true;
+        }
+      } else {
+        // No previous attempts at all
+        setAttemptNumber(1);
+        console.log("No previous attempts found, setting attempt to 1");
+        return true;
+      }
+    } catch (err) {
+      console.error("Error checking attempt count", err);
+      // Default to 1 if we can't check
+      setAttemptNumber(1);
+      return true;
+    }
+  };
+
+  const handleStartQuiz = async (subject) => {
+    // Check if the user has reached max attempts before starting quiz
+    const canAttempt = await checkAttempts(subject.code);
+    if (!canAttempt) return;
+    
     setSelectedSubject(subject);
     setQuizActive(true);
     setCurrentPage(1);
@@ -133,17 +243,34 @@ function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
       usn,
       sub_name: selectedSubject.code,
       score,
-      attempt_no: 1,
+      attempt_no: attemptNumber,
       quiz_date: new Date().toISOString(),
       time_taken: timeTaken,
     };
 
     try {
       await axios.post("http://localhost:8080/api/storeScores", submissionData);
-      alert(`✔️ ${selectedSubject.display} Quiz Submitted Successfully!\n\nScore: ${score}/${totalQuestions}\nTime Taken: ${formatTime(timeTaken)}`);
-      setCompletedTests(prev => [...prev, selectedSubject.code]);
-      if(completedTests.length==5)
-      setTechnicalStatus(true);
+      alert(`✔️ ${selectedSubject.display} Quiz Submitted Successfully!\n\nScore: ${score}/${totalQuestions}\nTime Taken: ${formatTime(timeTaken)}\nAttempt: ${attemptNumber}`);
+      
+      // Update attempts count in state
+      setAttemptsCount(prev => ({
+        ...prev,
+        [selectedSubject.code]: attemptNumber
+      }));
+      
+      // Add to completed tests if it's not already there
+      if (!completedTests.includes(selectedSubject.code)) {
+        const updatedCompletedTests = [...completedTests, selectedSubject.code];
+        setCompletedTests(updatedCompletedTests);
+        
+        // Check if technical section is now completed
+        if (updatedCompletedTests.length >= 5) {
+          setTechnicalStatus(true);
+        }
+      }
+      
+      // Reload all subject data to ensure state is in sync with database
+      loadAllSubjectAttempts();
     } catch (error) {
       console.error("Error submitting quiz", error);
       alert("❌ Failed to submit quiz. Please try again.");
@@ -252,6 +379,10 @@ function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {subjects.map((subject) => {
                 const isCompleted = completedTests.includes(subject.code);
+                const currentAttempts = attemptsCount[subject.code] || 0;
+                const attemptsLeft = MAX_ATTEMPTS - currentAttempts;
+                const canRetake = attemptsLeft > 0;
+                
                 return (
                   <div 
                     key={subject.code}
@@ -272,16 +403,27 @@ function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
                         )}
                       </div>
                       <p className="text-sm text-gray-500 mt-1">Subject Code: {subject.code}</p>
+                      
+                      {/* Display attempt information */}
+                      <p className="text-sm text-gray-600 mt-2">
+                        {currentAttempts > 0 ? 
+                          `Attempts: ${currentAttempts}/${MAX_ATTEMPTS}` : 
+                          `Attempts: 0/${MAX_ATTEMPTS}`
+                        }
+                      </p>
+                      
                       <div className="mt-4">
                         <button
                           onClick={() => handleStartQuiz(subject)}
-                          disabled={isCompleted}
+                          disabled={!canRetake && isCompleted}
                           className={`w-full py-2 rounded-md font-medium text-sm
-                            ${isCompleted 
+                            ${(!canRetake && isCompleted)
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                               : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                         >
-                          {isCompleted ? 'Test Completed' : 'Start Test'}
+                          {isCompleted 
+                            ? (canRetake ? `Retake Test (${attemptsLeft} left)` : 'Max Attempts Reached') 
+                            : 'Start Test'}
                         </button>
                       </div>
                     </div>
@@ -296,7 +438,9 @@ function UnifiedDashboard({ loginName, stdname, usn , setTechnicalStatus }) {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-xl font-semibold text-gray-800">{selectedSubject.display} Test</h2>
-                <p className="text-sm text-gray-500">Answer all questions to complete the test</p>
+                <p className="text-sm text-gray-500">
+                  Answer all questions to complete the test • Attempt #{attemptNumber}
+                </p>
               </div>
               <div className="flex items-center">
                 <div className="text-red-600 font-medium flex items-center">
