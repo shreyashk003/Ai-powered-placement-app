@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import AutoTypeComponent from './AutoTypeComponent';
@@ -14,33 +14,34 @@ import {
   Monitor
 } from 'lucide-react';
 
-function AIPlacement({ name , stdname , loginName}) {
+function AIPlacement({ name , stdname , loginName,sslcScore,pucScore,be1Score,be2Score,be3Score}) {
   // State variables
   const [typeStatus, setTypeStatus] = useState(false);
-  const [outcome, setResult] = useState("");
+  const [outcome, setOutcome] = useState("");
   const [predictionAccuracy, setPredictionAccuracy] = useState(0.0);
   const [isLoading, setIsLoading] = useState(false);
+  const[predictionResult,setPredictionResult]=useState('Result')
   
   // Form fields with refs
-  const [sslc, setSslc] = useState(97); 
+  const [sslc, setSslc] = useState(sslcScore); 
   const sslc1 = useRef(null);
   
-  const [puc, setPuc] = useState(84); 
+  const [puc, setPuc] = useState(pucScore); 
   const puc1 = useRef(null);
   
-  const [be1, setBe1] = useState(75); 
+  const [be1, setBe1] = useState(be1Score); 
   const be11 = useRef(null);
   
-  const [be2, setBe2] = useState(83); 
+  const [be2, setBe2] = useState(be2Score); 
   const be21 = useRef(null);
   
-  const [be3, setBe3] = useState(79); 
+  const [be3, setBe3] = useState(be3Score); 
   const be31 = useRef(null);
   
-  const [apti, setApti] = useState(35); 
+  const [apti, setApti] = useState(aptiScore); 
   const apti1 = useRef(null);
   
-  const [cskill, setCskill] = useState(27); 
+  const [cskill, setCskill] = useState(progScore); 
   const cskill1 = useRef(null);
   
   const [dsa, setDsa] = useState(23); 
@@ -68,6 +69,61 @@ function AIPlacement({ name , stdname , loginName}) {
   const [internship, setInternship] = useState(false);
   const [orators, setOrators] = useState(false);
   const [projects, setProjects] = useState(false);
+  const[allScores,setAllScores]=useState([]);
+
+  const payload={
+    usn:loginName
+  }
+
+var aptiScore=[]  
+ var progScore=[]
+ var DSAScore=[]
+ var DBScore=[]
+ var SEScore=[]
+ var OSScore=[]
+ var CNScore=[]
+ var OOPJScore=[]
+useEffect(()=>{
+  alert("Iamhere")
+  axios.post("http://localhost:8080/api/getAllScores",payload)
+  .then(response=>{
+
+    setAllScores(response.data);
+
+    aptiScore=response.data.filter(score=>score.sub_name==="Apti" && score.attempt_no===1)
+    progScore=response.data.filter(score=>score.sub_name==="Program-Skill" && score.attempt_no===1)
+    DSAScore=response.data.filter(score=>score.sub_name==="DSA" && score.attempt_no===1)
+    DBScore=response.data.filter(score=>score.sub_name==="DB" && score.attempt_no===1)
+    SEScore=response.data.filter(score=>score.sub_name==="SE" && score.attempt_no===1)
+    OSScore=response.data.filter(score=>score.sub_name==="OS" && score.attempt_no===1)
+    CNScore=response.data.filter(score=>score.sub_name==="CN" && score.attempt_no===1)
+    OOPJScore=response.data.filter(score=>score.sub_name==="OOPS" && score.attempt_no===1)
+
+
+
+
+    alert(aptiScore[0].score+aptiScore[0].sub_name)
+
+   
+    //alert(aptiScore[0].score)
+    console.log(response.data)
+    console.log(aptiScore)
+    console.log(progScore)
+     setApti(aptiScore[0].score) 
+     setCskill(progScore[0].score)
+   setDsa(DSAScore[0].score)
+   setDb(DBScore[0].score)
+   setSe(SEScore[0].score)
+   setOs(OSScore[0].score)
+   setCn(CNScore[0].score)
+   setOopj(OOPJScore[0].score)
+  })
+  .catch(err=>{
+    console.log(err)
+  })
+},[apti,cskill])
+  
+  
 
   // Calculate star rating based on inputs
   const calculateRating = () => {
@@ -91,8 +147,20 @@ function AIPlacement({ name , stdname , loginName}) {
       hackathon ? 1 : 0, codathon ? 1 : 0, startup ? 1 : 0, 
       internship ? 1 : 0, orators ? 1 : 0, projects ? 1 : 0
     ];
-
     axios.post("http://localhost:8080/run-python", args)
+    .then((response) => {
+      const res = response.data;
+      const result = res.slice(-2);
+      const accuracy = res.slice(-8, -3);
+      console.log(result)
+      setOutcome(result);
+      setPredictionAccuracy(accuracy);
+      setPredictionResult(parseInt(result) === 1 ? 'Success' : 'Fail');
+      setTypeStatus(true);
+    })
+    .catch((err) => console.log(err));
+
+    /*axios.post("http://localhost:8080/run-python", args)
       .then(response => {
         const data = response.data;
         console.log("Response from AI "+data)
@@ -110,7 +178,8 @@ function AIPlacement({ name , stdname , loginName}) {
       .catch(err => {
         console.error(err);
         setIsLoading(false);
-      });
+      });*/
+      
   };
 
   return (

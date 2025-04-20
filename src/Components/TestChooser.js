@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom"; // Import navigate
 import Technical_subject_Skill from "./Technical_subject_Skill";
 import Login from "./Login";
 
-function TestChooser({ loginName, setTechnicalStatus }) {
+function TestChooser({ loginName, setTechnicalStatus,usn }) {
     const [subname, setSubname] = useState("");
     const [selectedSubjectName, setSelectedSubjectName] = useState("Choose Subject");
     const selectedSubject = useRef(null);
@@ -122,7 +122,7 @@ function TestChooser({ loginName, setTechnicalStatus }) {
 
                 {subname && (
                     <div className="mt-4 animate-fade-in">
-                        <Technical_subject_Skill sub_name={subname} setTechnicalStatus={setTechnicalStatus} />
+                        <Technical_subject_Skill sub_name={subname} setTechnicalStatus={setTechnicalStatus} usn={usn} />
                     </div>
                 )}
 

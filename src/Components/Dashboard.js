@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import TestChooser from './TestChooser';
 import TechnicalSubjectSkill from './Technical_subject_Skill';
 
-const Dashboard = ({ loginName, setTechnicalStatus,stdname }) => {
+const Dashboard = ({ loginName, setTechnicalStatus,stdname,usn }) => {
   const [activeTab, setActiveTab] = useState('tests');
 
   return (
@@ -69,8 +69,7 @@ const Dashboard = ({ loginName, setTechnicalStatus,stdname }) => {
               </h2>
             </div>
             <div className="p-6">
-              <TestChooser loginName={loginName} setTechnicalStatus={setTechnicalStatus} />
-              <TechnicalSubjectSkill />
+              <TestChooser loginName={loginName} setTechnicalStatus={setTechnicalStatus} usn={usn} />
             </div>
           </div>
         )}

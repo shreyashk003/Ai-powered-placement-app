@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Eye, EyeOff, Lock, User, Shield } from "lucide-react";
 
-const Login = ({ setRole, setUsername, setloginName, setusn , setstdName }) => {
+const Login = ({ setRole, setUsername, setloginName, setusn , setstdName,setSSLCScore,setPucScore,setBe1Score,setBe2Score,setBe3Score }) => {
     const [user, setUser] = useState({
         username: "",
         password: "",
@@ -56,6 +56,13 @@ const Login = ({ setRole, setUsername, setloginName, setusn , setstdName }) => {
                 setUsername(userData.stdname || userData.username);
                 setloginName(userData.username);
                 setstdName(userData.stdname)
+                setSSLCScore(userData.sslcscore);
+                setPucScore(userData.pucscore)
+                setBe1Score(userData.be1Score)
+                setBe2Score(userData.be2Score)
+                setBe3Score(userData.be3Score)
+                console.log(userData.sslcscore)
+                console.log(userData.pucscore)
 
                 setMessage("Login Successful!");
             } else {
