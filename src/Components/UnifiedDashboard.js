@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { Book, Check, ChevronDown, Clock, Award, X } from "lucide-react";
+import { Book, Check, Clock, Award, X } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
+function SimplifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
   const navigate = useNavigate();
   const [selectedSubject, setSelectedSubject] = useState(null);
-  const [completedTests, setCompletedTests] = useState([]);
-  const [attemptsCount, setAttemptsCount] = useState({});
+  const [subjectData, setSubjectData] = useState({});
   const [quizActive, setQuizActive] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [timer, setTimer] = useState(900); // 15 minutes
+  const [timer, setTimer] = useState(900);
   const [currentPage, setCurrentPage] = useState(1);
-  const [startTime, setStartTime] = useState(null);
-  const [attemptNumber, setAttemptNumber] = useState(1);
-  const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [lastScore, setLastScore] = useState(null);
+  const [timerInterval, setTimerInterval] = useState(null);
   const questionsPerPage = 5;
-  const MAX_ATTEMPTS = 3; // Maximum number of attempts allowed
+  const MAX_ATTEMPTS = 3;
+
+  // Extract branch from loginName
+  const stdBranch = loginName && loginName.length === 10 ? loginName.substring(5, 7).toLowerCase() : "cs";
 
   const subjectsList = {
     cs: [
@@ -42,8 +44,7 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
       { display: "Strength of Materials", code: "SM" },
       { display: "CAED", code: "CAED" },
       { display: "Building Design", code: "BD" },
-      { display: "Materials Management", code: "MM" },
-      { display: "Building Materials", code: "BM" }
+      { display: "Materials Management", code: "MM" }
     ],
     me: [
       { display: "Basics of Mechanical Engineering", code: "ME" },
@@ -51,381 +52,384 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
       { display: "Theory of Machines", code: "TM" },
       { display: "CAED", code: "CAED" },
       { display: "Machine Design", code: "MD" },
-      { display: "Fluid Mechanics", code: "FM" },
-      { display: "Mechatronics", code: "MT" }
+      { display: "Fluid Mechanics", code: "FM" }
     ]
   };
 
-  // Extract branch from loginName
-  const stdBranch = loginName && loginName.length === 10 ? loginName.substring(5, 7).toLowerCase() : "cs";
   const subjects = subjectsList[stdBranch] || [];
 
-  // Load all subject attempt data on mount
+  // Load subject data on component mount
   useEffect(() => {
     if (usn) {
-      loadAllSubjectAttempts();
+      loadSubjectData();
     }
+    
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
   }, [usn]);
-  
-  // New function to load all subject attempt data at once
-  const loadAllSubjectAttempts = async () => {
+
+  // Load all subject attempt data
+  const loadSubjectData = async () => {
     try {
       const response = await axios.get(`http://localhost:8080/api/getUserCompletedTests/${usn}`);
-      console.log("Loading all subject attempts:", response.data);
       
-      // Process the response to extract completed tests and attempt counts
-      const completed = [];
-      const attempts = {};
+      // Process subject data
+      const data = {};
+      
+      subjects.forEach(subject => {
+        data[subject.code] = {
+          completed: false,
+          attempts: 0,
+          scores: {}
+        };
+      });
       
       if (Array.isArray(response.data)) {
-        // Group attempts by subject
-        const subjectAttempts = {};
-        
         response.data.forEach(test => {
-          if (!subjectAttempts[test.sub_name]) {
-            subjectAttempts[test.sub_name] = [];
+          if (data[test.sub_name]) {
+            data[test.sub_name].completed = true;
+            data[test.sub_name].attempts = Math.max(data[test.sub_name].attempts, test.attempt_no);
+            data[test.sub_name].scores[test.attempt_no] = test.score;
           }
-          subjectAttempts[test.sub_name].push(test.attempt_no);
-          
-          // Mark subject as completed if at least one attempt exists
-          if (!completed.includes(test.sub_name)) {
-            completed.push(test.sub_name);
-          }
-        });
-        
-        // Find maximum attempt number for each subject
-        Object.keys(subjectAttempts).forEach(subject => {
-          attempts[subject] = Math.max(...subjectAttempts[subject]);
         });
       }
       
-      console.log("Processed completed tests:", completed);
-      console.log("Processed attempts count:", attempts);
+      setSubjectData(data);
       
-      setCompletedTests(completed);
-      setAttemptsCount(attempts);
-      
-      // Check if technical section is completed (5+ subjects completed)
-      if (completed.length >= 5) {
-        setTechnicalStatus(true);
-      }
+      // Check if all subjects are completed
+      checkTechnicalCompletion(data);
     } catch (error) {
-      console.error("Error loading subject attempts:", error);
+      console.error("Error loading subject data:", error);
     }
   };
 
-  // Check attempts for a specific subject before starting quiz
-  const checkAttempts = async (subjectCode) => {
-    try {
-      // Create the request payload
-      const payload = {
-        usn: usn,
-        sub_name: subjectCode
-      };
-      
-      // Send the POST request with the payload
-      const response = await axios.post("http://localhost:8080/api/getTechAttempt_no", payload);
-      
-      console.log(`Checking attempts for user: ${usn} for subject: ${subjectCode}`);
-      console.log("Attempts data:", response.data);
-      
-      if (response.data && response.data.length > 0) {
-        // Filter for only the specific subject attempts
-        const subjectAttempts = response.data.filter(
-          attempt => attempt.sub_name === subjectCode
-        );
-        
-        if (subjectAttempts.length > 0) {
-          // Find the highest attempt number
-          const highestAttempt = Math.max(
-            ...subjectAttempts.map(attempt => attempt.attempt_no)
-          );
-          
-          // Update the attempts count in state
-          setAttemptsCount(prev => ({
-            ...prev,
-            [subjectCode]: highestAttempt
-          }));
-          
-          if (highestAttempt >= MAX_ATTEMPTS) {
-            setMaxAttemptsReached(true);
-            alert(`You have already reached the maximum of ${MAX_ATTEMPTS} attempts for this assessment.`);
-            return false;
-          } else {
-            setAttemptNumber(highestAttempt + 1);
-            console.log(`Set attempt number to ${highestAttempt + 1}`);
-            return true;
-          }
-        } else {
-          // No previous attempts for this subject
-          setAttemptNumber(1);
-          console.log("No previous attempts found, setting attempt to 1");
-          return true;
-        }
-      } else {
-        // No previous attempts at all
-        setAttemptNumber(1);
-        console.log("No previous attempts found, setting attempt to 1");
-        return true;
-      }
-    } catch (err) {
-      console.error("Error checking attempt count", err);
-      // Default to 1 if we can't check
-      setAttemptNumber(1);
-      return true;
-    }
-  };
-
-  const handleStartQuiz = async (subject) => {
-    // Check if the user has reached max attempts before starting quiz
-    const canAttempt = await checkAttempts(subject.code);
-    if (!canAttempt) return;
+  // Check if technical assessment is complete
+  const checkTechnicalCompletion = (data) => {
+    const allComplete = subjects.every(subject => 
+      data[subject.code] && data[subject.code].attempts >= MAX_ATTEMPTS
+    );
     
-    setSelectedSubject(subject);
+    if (allComplete) {
+      setTechnicalStatus(true);
+    }
+  };
+
+  // Start quiz for a subject
+  const handleStartQuiz = async (subject) => {
+    const subjectInfo = subjectData[subject.code] || { attempts: 0 };
+    const nextAttemptNumber = subjectInfo.attempts + 1;
+    
+    // Check if max attempts reached
+    if (nextAttemptNumber > MAX_ATTEMPTS) {
+      alert(`You've already completed all ${MAX_ATTEMPTS} attempts for ${subject.display}.`);
+      return;
+    }
+    
+    setSelectedSubject({...subject, attemptNumber: nextAttemptNumber});
     setQuizActive(true);
     setCurrentPage(1);
     setSelectedAnswers({});
     setTimer(900);
     
-    // Fetch questions
-    const fetchQuestions = async () => {
-      try {
-        const response = await axios.get(`http://localhost:8080/api/getTechSubQuestionsByName/${subject.code}`);
-        setQuestions(response.data);
-        setStartTime(new Date());
-      } catch (error) {
-        console.error('Error fetching questions:', error);
-      }
-    };
-    fetchQuestions();
-    
-    // Start timer
-    const countdown = setInterval(() => {
-      setTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(countdown);
-          handleSubmitQuiz();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(countdown);
+    try {
+      const response = await axios.get(`http://localhost:8080/api/getTechSubQuestionsByName/${subject.code}`);
+      setQuestions(response.data);
+      
+      // Start timer
+      const countdown = setInterval(() => {
+        setTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(countdown);
+            handleSubmitQuiz();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      setTimerInterval(countdown);
+    } catch (error) {
+      console.error('Error fetching questions:', error);
+      alert('Failed to load questions. Please try again.');
+      setQuizActive(false);
+    }
   };
 
-  const handleAnswerSelect = (q_no, option) => {
+  // Handle answer selection
+  const handleAnswerSelect = (questionNo, option) => {
     setSelectedAnswers(prev => ({
       ...prev,
-      [q_no.toString()]: option,
+      [questionNo.toString()]: option,
     }));
   };
 
+  // Submit quiz
   const handleSubmitQuiz = async () => {
-    const totalQuestions = questions.length;
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      setTimerInterval(null);
+    }
+    
+    if (!selectedSubject) {
+      setQuizActive(false);
+      return;
+    }
+    
     const unanswered = questions.filter(q => !selectedAnswers[q.q_no]).length;
-
     if (unanswered > 0) {
       const confirmSubmit = window.confirm(`You have ${unanswered} unanswered question(s). Are you sure you want to submit?`);
       if (!confirmSubmit) return;
     }
 
+    // Calculate score
     let score = 0;
     questions.forEach((q) => {
       const correctOption = q[`option_${q.correct_ans}`];
       if (selectedAnswers[q.q_no] === correctOption) score++;
     });
 
-    const endTime = new Date();
-    const timeTaken = Math.floor((endTime - startTime) / 1000);
-
+    // Submit data
     const submissionData = {
       usn,
       sub_name: selectedSubject.code,
       score,
-      attempt_no: attemptNumber,
+      attempt_no: selectedSubject.attemptNumber,
       quiz_date: new Date().toISOString(),
-      time_taken: timeTaken,
+      time_taken: Math.floor((900 - timer)),
     };
 
     try {
       await axios.post("http://localhost:8080/api/storeScores", submissionData);
-      alert(`✔️ ${selectedSubject.display} Quiz Submitted Successfully!\n\nScore: ${score}/${totalQuestions}\nTime Taken: ${formatTime(timeTaken)}\nAttempt: ${attemptNumber}`);
       
-      // Update attempts count in state
-      setAttemptsCount(prev => ({
+      // Update local state
+      setSubjectData(prev => ({
         ...prev,
-        [selectedSubject.code]: attemptNumber
+        [selectedSubject.code]: {
+          ...prev[selectedSubject.code],
+          completed: true,
+          attempts: selectedSubject.attemptNumber,
+          scores: {
+            ...prev[selectedSubject.code]?.scores,
+            [selectedSubject.attemptNumber]: score
+          }
+        }
       }));
       
-      // Add to completed tests if it's not already there
-      if (!completedTests.includes(selectedSubject.code)) {
-        const updatedCompletedTests = [...completedTests, selectedSubject.code];
-        setCompletedTests(updatedCompletedTests);
-        
-        // Check if technical section is now completed
-        if (updatedCompletedTests.length >= 5) {
-          setTechnicalStatus(true);
-        }
-      }
+      // Store last score for modal
+      setLastScore({
+        subject: selectedSubject,
+        score,
+        total: questions.length
+      });
       
-      // Reload all subject data to ensure state is in sync with database
-      loadAllSubjectAttempts();
+      // Show score modal
+      setShowScoreModal(true);
+      
+      // Reload subject data
+      loadSubjectData();
     } catch (error) {
       console.error("Error submitting quiz", error);
-      alert("❌ Failed to submit quiz. Please try again.");
+      alert("Failed to submit quiz. Please try again.");
+      setQuizActive(false);
     }
-    
-    setQuizActive(false);
-    setSelectedSubject(null);
   };
 
+  // Close score modal
+  const handleCloseScoreModal = () => {
+    setShowScoreModal(false);
+    setSelectedSubject(null);
+    setQuizActive(false);
+  };
+
+  // Exit quiz
+  const handleExitQuiz = () => {
+    if (window.confirm("Are you sure you want to exit? Your progress will be lost.")) {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        setTimerInterval(null);
+      }
+      
+      setQuizActive(false);
+      setSelectedSubject(null);
+    }
+  };
+
+  // Navigation for quiz pages
   const startIndex = (currentPage - 1) * questionsPerPage;
   const endIndex = startIndex + questionsPerPage;
   const currentQuestions = questions.slice(startIndex, endIndex);
   const totalPages = Math.ceil(questions.length / questionsPerPage);
 
+  // Format time for display
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Calculate dashboard stats
+  const completedSubjects = Object.values(subjectData).filter(subject => subject.completed).length;
+  const completedPercentage = subjects.length ? (completedSubjects / subjects.length) * 100 : 0;
+  
+  // Calculate average score
+  const calculateAverageScore = () => {
+    let totalScore = 0;
+    let totalTests = 0;
+    
+    Object.values(subjectData).forEach(subject => {
+      Object.values(subject.scores || {}).forEach(score => {
+        totalScore += score;
+        totalTests++;
+      });
+    });
+    
+    return totalTests > 0 ? (totalScore / totalTests) : 0;
+  };
+  
+  const avgScore = calculateAverageScore();
+
+  // Check if all subjects have at least one attempt
+  const allSubjectsStarted = subjects.every(subject => 
+    subjectData[subject.code] && subjectData[subject.code].attempts >= 1
+  );
+
+  // Progress to next component if all subjects are done
+  const handleProceedToProgramming = () => {
+    if (allSubjectsStarted) {
+      navigate("/program-skill");
+    } else {
+      alert("Please attempt all subjects at least once before proceeding.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <Book className="text-blue-600 mr-3" size={28} />
-              <h1 className="text-xl font-bold text-gray-800">Technical Skills Assessment Dashboard</h1>
+              <Book className="text-blue-600 mr-2" size={24} />
+              <h1 className="text-lg font-bold text-gray-800">Technical Assessment</h1>
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full flex items-center">
-                <span className="font-medium">{loginName.toUpperCase()} • {stdname}</span>
-              </div>
+            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+              {loginName ? loginName.toUpperCase() : 'STUDENT'} • {stdname || 'User'}
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-6">
         {!quizActive ? (
           <>
             {/* Dashboard Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-500 uppercase font-medium">Completed Tests</p>
-                    <p className="text-2xl font-bold text-gray-800">{completedTests.length}/{subjects.length}</p>
-                  </div>
-                  <div className="bg-green-100 p-3 rounded-full">
-                    <Check className="w-6 h-6 text-green-600" />
+                  <p className="text-gray-500 text-sm">Completed Subjects</p>
+                  <div className="bg-green-100 p-2 rounded-full">
+                    <Check size={16} className="text-green-600" />
                   </div>
                 </div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full" 
-                      style={{ width: `${(completedTests.length / subjects.length) * 100}%` }} 
-                    />
-                  </div>
+                <p className="text-xl font-bold mt-1">{completedSubjects}/{subjects.length}</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div className="bg-green-500 h-2 rounded-full" style={{ width: `${completedPercentage}%` }} />
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-500 uppercase font-medium">Average Score</p>
-                    <p className="text-2xl font-bold text-gray-800">82%</p>
-                  </div>
-                  <div className="bg-blue-100 p-3 rounded-full">
-                    <Award className="w-6 h-6 text-blue-600" />
+                  <p className="text-gray-500 text-sm">Average Score</p>
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <Award size={16} className="text-blue-600" />
                   </div>
                 </div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '82%' }} />
-                  </div>
+                <p className="text-xl font-bold mt-1">{avgScore.toFixed(1)}%</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${avgScore}%` }} />
                 </div>
               </div>
               
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-gray-500 uppercase font-medium">Remaining Tests</p>
-                    <p className="text-2xl font-bold text-gray-800">{subjects.length - completedTests.length}</p>
-                  </div>
-                  <div className="bg-purple-100 p-3 rounded-full">
-                    <Clock className="w-6 h-6 text-purple-600" />
+                  <p className="text-gray-500 text-sm">Remaining Subjects</p>
+                  <div className="bg-purple-100 p-2 rounded-full">
+                    <Clock size={16} className="text-purple-600" />
                   </div>
                 </div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full" 
-                      style={{ width: `${((subjects.length - completedTests.length) / subjects.length) * 100}%` }} 
-                    />
-                  </div>
+                <p className="text-xl font-bold mt-1">{subjects.length - completedSubjects}</p>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${subjects.length - completedSubjects > 0 ? ((subjects.length - completedSubjects) / subjects.length) * 100 : 0}%` }} />
                 </div>
               </div>
             </div>
 
+            {/* Action Button */}
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={handleProceedToProgramming}
+                className={`py-2 px-4 rounded-md text-white font-medium ${
+                  allSubjectsStarted ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Proceed to Programming Skills
+              </button>
+            </div>
+
             {/* Subject Cards */}
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">Available Tests</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {subjects.map((subject) => {
-                const isCompleted = completedTests.includes(subject.code);
-                const currentAttempts = attemptsCount[subject.code] || 0;
-                const attemptsLeft = MAX_ATTEMPTS - currentAttempts;
-                const canRetake = attemptsLeft > 0;
+                const subjectInfo = subjectData[subject.code] || { completed: false, attempts: 0, scores: {} };
+                const attemptsLeft = MAX_ATTEMPTS - subjectInfo.attempts;
                 
                 return (
-                  <div 
-                    key={subject.code}
-                    className={`border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow
-                      ${isCompleted ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}
-                  >
-                    <div className="p-5">
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-medium text-gray-800">{subject.display}</h3>
-                        {isCompleted ? (
-                          <span className="bg-green-100 text-green-600 text-xs font-medium px-2.5 py-0.5 rounded flex items-center">
-                            <Check size={12} className="mr-1" /> Completed
+                  <div key={subject.code} className="bg-white border rounded-lg shadow-sm">
+                    <div className="p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium">{subject.display}</h3>
+                        {subjectInfo.completed ? (
+                          <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded">
+                            Attempted
                           </span>
                         ) : (
-                          <span className="bg-blue-100 text-blue-600 text-xs font-medium px-2.5 py-0.5 rounded">
+                          <span className="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded">
                             Available
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">Subject Code: {subject.code}</p>
                       
-                      {/* Display attempt information */}
-                      <p className="text-sm text-gray-600 mt-2">
-                        {currentAttempts > 0 ? 
-                          `Attempts: ${currentAttempts}/${MAX_ATTEMPTS}` : 
-                          `Attempts: 0/${MAX_ATTEMPTS}`
-                        }
-                      </p>
+                      <p className="text-sm text-gray-500 mb-2">Attempts: {subjectInfo.attempts}/{MAX_ATTEMPTS}</p>
                       
-                      <div className="mt-4">
-                        <button
-                          onClick={() => handleStartQuiz(subject)}
-                          disabled={!canRetake && isCompleted}
-                          className={`w-full py-2 rounded-md font-medium text-sm
-                            ${(!canRetake && isCompleted)
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                              : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-                        >
-                          {isCompleted 
-                            ? (canRetake ? `Retake Test (${attemptsLeft} left)` : 'Max Attempts Reached') 
+                      {Object.keys(subjectInfo.scores || {}).length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs text-gray-500 mb-1">Scores:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(subjectInfo.scores).map(([attempt, score]) => (
+                              <span key={attempt} className="bg-gray-100 text-xs px-1.5 py-0.5 rounded">
+                                #{attempt}: {score}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={() => handleStartQuiz(subject)}
+                        disabled={subjectInfo.attempts >= MAX_ATTEMPTS}
+                        className={`w-full py-1.5 rounded text-sm font-medium ${
+                          subjectInfo.attempts >= MAX_ATTEMPTS
+                            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                      >
+                        {subjectInfo.attempts >= MAX_ATTEMPTS
+                          ? 'All Attempts Used'
+                          : subjectInfo.completed
+                            ? `Continue (${attemptsLeft} left)`
                             : 'Start Test'}
-                        </button>
-                      </div>
+                      </button>
                     </div>
                   </div>
                 );
@@ -434,111 +438,162 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
           </>
         ) : (
           /* Quiz Interface */
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white shadow-md rounded-lg p-4">
+            <div className="flex justify-between items-center mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800">{selectedSubject.display} Test</h2>
+                <h2 className="text-lg font-semibold">{selectedSubject?.display} Test</h2>
                 <p className="text-sm text-gray-500">
-                  Answer all questions to complete the test • Attempt #{attemptNumber}
+                  Attempt #{selectedSubject?.attemptNumber}/{MAX_ATTEMPTS}
                 </p>
               </div>
               <div className="flex items-center">
-                <div className="text-red-600 font-medium flex items-center">
-                  <Clock size={20} className="mr-2" /> {formatTime(timer)}
+                <div className="text-red-600 font-medium mr-3">
+                  <Clock size={16} className="inline mr-1" /> {formatTime(timer)}
                 </div>
                 <button 
-                  onClick={() => {
-                    if(window.confirm("Are you sure you want to exit? Your progress will be lost.")) {
-                      setQuizActive(false);
-                      setSelectedSubject(null);
-                    }
-                  }}
-                  className="ml-4 p-2 text-gray-500 hover:bg-gray-100 rounded-full"
+                  onClick={handleExitQuiz}
+                  className="p-1 text-gray-500 hover:bg-gray-100 rounded-full"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="space-y-8">
-              {currentQuestions.map((question, index) => (
-                <div key={question.q_no} className="p-4 border border-gray-200 rounded-lg">
-                  <h3 className="font-medium mb-3 text-gray-800">
-                    Q{startIndex + index + 1}. {question.question}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[question.option_1, question.option_2, question.option_3, question.option_4].map((opt, i) => (
-                      <label 
-                        key={i} 
-                        className={`flex items-center p-3 rounded-md border cursor-pointer transition-colors
-                          ${selectedAnswers[question.q_no] === opt 
-                            ? 'bg-blue-50 border-blue-300' 
-                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+            {/* Questions */}
+            {currentQuestions.length > 0 ? (
+              <div className="space-y-4">
+                {currentQuestions.map((question, index) => (
+                  <div key={question.q_no} className="p-3 border rounded-lg">
+                    <h3 className="font-medium mb-2">
+                      Q{startIndex + index + 1}. {question.question}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {[1, 2, 3, 4].map((optionNum) => (
+                        <label 
+                          key={optionNum} 
+                          className={`flex items-center p-2 rounded border cursor-pointer ${
+                            selectedAnswers[question.q_no] === question[`option_${optionNum}`] 
+                              ? 'bg-blue-50 border-blue-300' 
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`q${question.q_no}`}
+                            value={question[`option_${optionNum}`]}
+                            checked={selectedAnswers[question.q_no] === question[`option_${optionNum}`]}
+                            onChange={() => handleAnswerSelect(question.q_no, question[`option_${optionNum}`])}
+                            className="mr-2"
+                          />
+                          <span>{question[`option_${optionNum}`]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <div className="mt-4 flex justify-between items-center">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded font-medium disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  
+                  <div className="flex space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i + 1)}
+                        className={`w-7 h-7 rounded-full text-sm ${
+                          currentPage === i + 1
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
                       >
-                        <input
-                          type="radio"
-                          name={`q${question.q_no}`}
-                          value={opt}
-                          checked={selectedAnswers[question.q_no] === opt}
-                          onChange={() => handleAnswerSelect(question.q_no, opt)}
-                          className="accent-blue-600 mr-3"
-                        />
-                        <span>{opt}</span>
-                      </label>
+                        {i + 1}
+                      </button>
                     ))}
                   </div>
+                  
+                  {currentPage === totalPages ? (
+                    <button
+                      onClick={handleSubmitQuiz}
+                      className="px-4 py-1 bg-green-600 text-white rounded font-medium"
+                    >
+                      Submit
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      className="px-3 py-1 bg-blue-600 text-white rounded font-medium"
+                    >
+                      Next
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-6 flex justify-between items-center">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => prev - 1)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 rounded-full font-medium ${
-                      currentPage === i + 1
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
               </div>
-              
-              <div className="flex space-x-3">
-                {currentPage === totalPages ? (
-                  <button
-                    onClick={handleSubmitQuiz}
-                    className="px-6 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700"
-                  >
-                    Submit Quiz
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
-                  >
-                    Next
-                  </button>
-                )}
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-gray-600">Loading questions...</p>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Score Modal */}
+      {showScoreModal && lastScore && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-4 max-w-sm w-full">
+            <div className="text-center mb-4">
+              <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Check className="text-green-600" size={24} />
+              </div>
+              <h3 className="text-lg font-bold">Quiz Completed!</h3>
+              <p className="text-gray-600">{lastScore.subject.display}</p>
+            </div>
+            
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-600">Score:</span>
+                <span className="font-medium">{lastScore.score}/{lastScore.total}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-600">Attempt:</span>
+                <span className="font-medium">{lastScore.subject.attemptNumber}/{MAX_ATTEMPTS}</span>
+              </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              {lastScore.subject.attemptNumber < MAX_ATTEMPTS && (
+                <button
+                  onClick={() => {
+                    setShowScoreModal(false);
+                    handleStartQuiz({
+                      ...lastScore.subject,
+                      attemptNumber: lastScore.subject.attemptNumber + 1
+                    });
+                  }}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded font-medium"
+                >
+                  Try Again
+                </button>
+              )}
+              
+              <button
+                onClick={handleCloseScoreModal}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded font-medium"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default UnifiedDashboard;
+export default SimplifiedDashboard;

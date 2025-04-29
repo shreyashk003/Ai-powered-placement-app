@@ -14,13 +14,15 @@ import {
   Monitor
 } from 'lucide-react';
 
-function AIPlacement({ name , stdname , loginName,sslcScore,pucScore,be1Score,be2Score,be3Score}) {
+function AIPlacement({ name, stdname, loginName, sslcScore, pucScore, be1Score, be2Score, be3Score }) {
   // State variables
   const [typeStatus, setTypeStatus] = useState(false);
   const [outcome, setOutcome] = useState("");
   const [predictionAccuracy, setPredictionAccuracy] = useState(0.0);
   const [isLoading, setIsLoading] = useState(false);
-  const[predictionResult,setPredictionResult]=useState('Result')
+  const [predictionResult, setPredictionResult] = useState('Result');
+  const [attemptNo, setAttemptNo] = useState(1); // Default to attempt 1
+  const [allScores, setAllScores] = useState([]);
   
   // Form fields with refs
   const [sslc, setSslc] = useState(sslcScore); 
@@ -38,28 +40,28 @@ function AIPlacement({ name , stdname , loginName,sslcScore,pucScore,be1Score,be
   const [be3, setBe3] = useState(be3Score); 
   const be31 = useRef(null);
   
-  const [apti, setApti] = useState(aptiScore); 
+  const [apti, setApti] = useState(0); 
   const apti1 = useRef(null);
   
-  const [cskill, setCskill] = useState(progScore); 
+  const [cskill, setCskill] = useState(0); 
   const cskill1 = useRef(null);
   
-  const [dsa, setDsa] = useState(23); 
+  const [dsa, setDsa] = useState(0); 
   const dsa1 = useRef(null);
   
-  const [db, setDb] = useState(21); 
+  const [db, setDb] = useState(0); 
   const db1 = useRef(null);
   
-  const [se, setSe] = useState(23); 
+  const [se, setSe] = useState(0); 
   const se1 = useRef(null);
   
-  const [os, setOs] = useState(20); 
+  const [os, setOs] = useState(0); 
   const os1 = useRef(null);
   
-  const [cn, setCn] = useState(23); 
+  const [cn, setCn] = useState(0); 
   const cn1 = useRef(null);
   
-  const [oopj, setOopj] = useState(22); 
+  const [oopj, setOopj] = useState(0); 
   const oopj1 = useRef(null);
 
   // Checkbox states
@@ -69,61 +71,73 @@ function AIPlacement({ name , stdname , loginName,sslcScore,pucScore,be1Score,be
   const [internship, setInternship] = useState(false);
   const [orators, setOrators] = useState(false);
   const [projects, setProjects] = useState(false);
-  const[allScores,setAllScores]=useState([]);
 
-  const payload={
-    usn:loginName
+  const payload = {
+    usn: loginName,
+    attempt_no:attemptNo
+  };
+
+
+  const getFreshdata=(newAttempt)=>{
+    const payload1={
+      usn: loginName,
+    attempt_no:newAttempt
+    }
+alert(newAttempt)
+    axios.post("http://localhost:8080/api/getAllScores", payload1)
+      .then(response => {
+        setAllScores(response.data);
+        // Initially load attempt 1 scores
+        updateScoresForAttempt(response.data, newAttempt);
+      })
+      .catch(err => {
+        console.log(err);
+      });
   }
+  // Fetch all scores initially
+  useEffect(() => {
+    axios.post("http://localhost:8080/api/getAllScores", payload)
+      .then(response => {
+        setAllScores(response.data);
+        // Initially load attempt 1 scores
+        updateScoresForAttempt(response.data, 1);
+      })
+      .catch(err => {
+        console.log(err);
+      });
+  }, []);
 
-var aptiScore=[]  
- var progScore=[]
- var DSAScore=[]
- var DBScore=[]
- var SEScore=[]
- var OSScore=[]
- var CNScore=[]
- var OOPJScore=[]
-useEffect(()=>{
-  alert("Iamhere")
-  axios.post("http://localhost:8080/api/getAllScores",payload)
-  .then(response=>{
+  // Function to update scores based on attempt number
+  const updateScoresForAttempt = (scores, attempt) => {
+    if (!scores || scores.length === 0) return;
 
-    setAllScores(response.data);
+    const aptiScore = scores.filter(score => score.sub_name === "Apti" && score.attempt_no === attempt);
+    const progScore = scores.filter(score => score.sub_name === "Program-Skill" && score.attempt_no === attempt);
+    const DSAScore = scores.filter(score => score.sub_name === "DSA" && score.attempt_no === attempt);
+    const DBScore = scores.filter(score => score.sub_name === "DB" && score.attempt_no === attempt);
+    const SEScore = scores.filter(score => score.sub_name === "SE" && score.attempt_no === attempt);
+    const OSScore = scores.filter(score => score.sub_name === "OS" && score.attempt_no === attempt);
+    const CNScore = scores.filter(score => score.sub_name === "CN" && score.attempt_no === attempt);
+    const OOPJScore = scores.filter(score => score.sub_name === "OOPS" && score.attempt_no === attempt);
 
-    aptiScore=response.data.filter(score=>score.sub_name==="Apti" && score.attempt_no===1)
-    progScore=response.data.filter(score=>score.sub_name==="Program-Skill" && score.attempt_no===1)
-    DSAScore=response.data.filter(score=>score.sub_name==="DSA" && score.attempt_no===1)
-    DBScore=response.data.filter(score=>score.sub_name==="DB" && score.attempt_no===1)
-    SEScore=response.data.filter(score=>score.sub_name==="SE" && score.attempt_no===1)
-    OSScore=response.data.filter(score=>score.sub_name==="OS" && score.attempt_no===1)
-    CNScore=response.data.filter(score=>score.sub_name==="CN" && score.attempt_no===1)
-    OOPJScore=response.data.filter(score=>score.sub_name==="OOPS" && score.attempt_no===1)
+    // Only update if score exists for this attempt
+    if (aptiScore && aptiScore.length > 0) setApti(aptiScore[0].score);
+    if (progScore && progScore.length > 0) setCskill(progScore[0].score);
+    if (DSAScore && DSAScore.length > 0) setDsa(DSAScore[0].score);
+    if (DBScore && DBScore.length > 0) setDb(DBScore[0].score);
+    if (SEScore && SEScore.length > 0) setSe(SEScore[0].score);
+    if (OSScore && OSScore.length > 0) setOs(OSScore[0].score);
+    if (CNScore && CNScore.length > 0) setCn(CNScore[0].score);
+    if (OOPJScore && OOPJScore.length > 0) setOopj(OOPJScore[0].score);
+  };
 
-
-
-
-    alert(aptiScore[0].score+aptiScore[0].sub_name)
-
-   
-    //alert(aptiScore[0].score)
-    console.log(response.data)
-    console.log(aptiScore)
-    console.log(progScore)
-     setApti(aptiScore[0].score) 
-     setCskill(progScore[0].score)
-   setDsa(DSAScore[0].score)
-   setDb(DBScore[0].score)
-   setSe(SEScore[0].score)
-   setOs(OSScore[0].score)
-   setCn(CNScore[0].score)
-   setOopj(OOPJScore[0].score)
-  })
-  .catch(err=>{
-    console.log(err)
-  })
-},[apti,cskill])
-  
-  
+  // Handle attempt number change
+  const handleAttemptChange = (newAttempt) => {
+alert(newAttempt)
+    setAttemptNo(newAttempt);
+    updateScoresForAttempt(allScores, newAttempt);
+    getFreshdata(newAttempt)
+  };
 
   // Calculate star rating based on inputs
   const calculateRating = () => {
@@ -147,39 +161,23 @@ useEffect(()=>{
       hackathon ? 1 : 0, codathon ? 1 : 0, startup ? 1 : 0, 
       internship ? 1 : 0, orators ? 1 : 0, projects ? 1 : 0
     ];
+    
     axios.post("http://localhost:8080/run-python", args)
-    .then((response) => {
-      const res = response.data;
-      const result = res.slice(-2);
-      const accuracy = res.slice(-8, -3);
-      console.log(result)
-      setOutcome(result);
-      setPredictionAccuracy(accuracy);
-      setPredictionResult(parseInt(result) === 1 ? 'Success' : 'Fail');
-      setTypeStatus(true);
-    })
-    .catch((err) => console.log(err));
-
-    /*axios.post("http://localhost:8080/run-python", args)
-      .then(response => {
-        const data = response.data;
-        console.log("Response from AI "+data)
-        setResult(data.substring(data.length - 2));
-        setPredictionAccuracy(data.substring(data.length - 8, data.length - 3));
-        
-        if (parseInt(data.substring(data.length - 2)) === 0) {
-          setTypeStatus(true);
-        } else {
-          setTypeStatus(true);
-        }
-        
+      .then((response) => {
+        const res = response.data;
+        const result = res.slice(-2);
+        const accuracy = res.slice(-8, -3);
+        console.log(result);
+        setOutcome(result);
+        setPredictionAccuracy(accuracy);
+        setPredictionResult(parseInt(result) === 1 ? 'Success' : 'Fail');
+        setTypeStatus(true);
         setIsLoading(false);
       })
-      .catch(err => {
-        console.error(err);
+      .catch((err) => {
+        console.log(err);
         setIsLoading(false);
-      });*/
-      
+      });
   };
 
   return (
@@ -200,12 +198,14 @@ useEffect(()=>{
               type="text" 
               className="border border-gray-300 rounded px-3 py-2 w-32"
               defaultValue={loginName}
+              readOnly
             />
             <label className="block text-sm font-medium text-gray-500 mb-1">Name</label>
             <input 
               type="text" 
               className="border border-gray-300 rounded px-3 py-2 w-32"
               defaultValue={stdname}
+              readOnly
             />
           </div>
           <div className="w-16 h-16 rounded-full overflow-hidden">
@@ -215,6 +215,51 @@ useEffect(()=>{
               className="w-full h-full object-cover"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Attempt Selection */}
+      <div className="mb-6 bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center mb-4 text-purple-700">
+          <h2 className="text-lg font-semibold">Select Attempt Number</h2>
+        </div>
+        <div className="flex space-x-6">
+          <div className="flex items-center">
+            <input
+              id="attempt1"
+              type="radio"
+              name="attempt"
+              checked={attemptNo === 1}
+              onChange={() => handleAttemptChange(1)}
+              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="attempt1" className="ml-2 text-sm font-medium text-gray-700">Attempt 1</label>
+          </div>
+          <div className="flex items-center">
+            <input
+              id="attempt2"
+              type="radio"
+              name="attempt"
+              checked={attemptNo === 2}
+              onChange={() => handleAttemptChange(2)}
+              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="attempt2" className="ml-2 text-sm font-medium text-gray-700">Attempt 2</label>
+          </div>
+          <div className="flex items-center">
+            <input
+              id="attempt3"
+              type="radio"
+              name="attempt"
+              checked={attemptNo === 3}
+              onChange={() => handleAttemptChange(3)}
+              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="attempt3" className="ml-2 text-sm font-medium text-gray-700">Attempt 3</label>
+          </div>
+        </div>
+        <div className="mt-2 text-sm text-gray-500">
+          Select an attempt number to view corresponding scores for that attempt
         </div>
       </div>
 
