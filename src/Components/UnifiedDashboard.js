@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Book, Check, Clock, Award, X } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { Route,BrowserRouter as Router,Routes } from "react-router-dom";
+import ProgramSkill from "./ProgramSkill";
 
-function SimplifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
+function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProgramStatus}) {
   const navigate = useNavigate();
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [subjectData, setSubjectData] = useState({});
@@ -294,13 +296,10 @@ function SimplifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
     subjectData[subject.code] && subjectData[subject.code].attempts >= 1
   );
 
-  // Progress to next component if all subjects are done
+  // Proceed to programming skills section
   const handleProceedToProgramming = () => {
-    if (allSubjectsStarted) {
-      navigate("/program-skill");
-    } else {
-      alert("Please attempt all subjects at least once before proceeding.");
-    }
+   // navigate("/program-skill");
+   setTechnicalStatus(true)
   };
 
   return (
@@ -373,6 +372,7 @@ function SimplifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
                 className={`py-2 px-4 rounded-md text-white font-medium ${
                   allSubjectsStarted ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
                 }`}
+                disabled={!allSubjectsStarted}
               >
                 Proceed to Programming Skills
               </button>
@@ -594,6 +594,11 @@ function SimplifiedDashboard({ loginName, stdname, usn, setTechnicalStatus }) {
       )}
     </div>
   );
+  <Routes>
+  <Route
+                        path="/program-skill"
+                        element={<ProgramSkill setProgramStatus={setProgramStatus} usn={usn} />}
+                    /></Routes>
 }
 
-export default SimplifiedDashboard;
+export default UnifiedDashboard;

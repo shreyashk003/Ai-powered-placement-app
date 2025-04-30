@@ -13,6 +13,7 @@ import AIPlacement from "./Components/AIPlacement";
 import AddQuestion from "./Components/AddQuestion";
 import UnifiedDashboard from "./Components/UnifiedDashboard";
 import ViewPerformance from "./Components/ViewPerformance";
+import NotesVideosDashboard from "./Components/NotesVideosDashboard"
 
 const App = () => {
     const navigate = useNavigate();
@@ -58,6 +59,7 @@ const App = () => {
     }, [role, aptiStatus, technicalStatus, programStatus, viewPerformance, navigate]);
 
     return (
+        <div>            
         <Routes>
             <Route
                 path="/"
@@ -73,9 +75,12 @@ const App = () => {
                         setBe2Score={setBe2Score}
                         setBe3Score={setBe3Score}
                         setSSLCScore={setSSLCScore}
+
                     />
+                    
                 }
             />
+            
 
             {role === "Student" && (
                 <>
@@ -98,6 +103,7 @@ const App = () => {
                                 setTechnicalStatus={setTechnicalStatus}
                                 stdname={stdname}
                                 usn={usn}
+                                setProgramStatus={setProgramStatus}
                             />
                         }
                     />
@@ -147,6 +153,9 @@ const App = () => {
             {/* Catch-all route for unauthenticated or invalid role */}
             {role === null && <Route path="*" element={<Navigate to="/" />} />}
         </Routes>
+        <NotesVideosDashboard></NotesVideosDashboard>
+        </div>
+
     );
 };
 
