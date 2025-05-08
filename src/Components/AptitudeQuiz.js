@@ -22,7 +22,7 @@ const AptitudeQuiz = ({ setAptiStatus, setusn, uname, usn, sub_name, stdname }) 
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  const questionsPerPage = 2; // Show 3 questions at a time
+  const questionsPerPage = 1; // Show 3 questions at a time
   const MAX_ATTEMPTS = 3;
 
   // Timer effect

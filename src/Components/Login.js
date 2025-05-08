@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, Lock, User, Shield, ChevronDown, Key, UserCircle, Settings, LogIn } from "lucide-react";
 
-const Login = ({ setRole, setUsername, setloginName, setusn, setstdName, setSSLCScore, setPucScore, setBe1Score, setBe2Score, setBe3Score }) => {
+const Login = ({sem,setSem, setRole, setUsername, setloginName, setusn, setstdName, setSSLCScore, setPucScore, setBe1Score, setBe2Score, setBe3Score }) => {
     const [user, setUser] = useState({
         username: "",
         password: "",
@@ -64,7 +64,8 @@ const Login = ({ setRole, setUsername, setloginName, setusn, setstdName, setSSLC
                 setBe1Score(userData.be1Score)
                 setBe2Score(userData.be2Score)
                 setBe3Score(userData.be3Score)
-
+                alert(userData.sem)
+                setSem(userData.sem)
                 setMessage("Login Successful!");
             } else {
                 setMessage("Invalid credentials! Please try again.");

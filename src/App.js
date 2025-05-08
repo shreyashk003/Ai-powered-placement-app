@@ -13,7 +13,11 @@ import AIPlacement from "./Components/AIPlacement";
 import AddQuestion from "./Components/AddQuestion";
 import UnifiedDashboard from "./Components/UnifiedDashboard";
 import ViewPerformance from "./Components/ViewPerformance";
-import NotesVideosDashboard from "./Components/NotesVideosDashboard"
+import NotesVideosDashboard from "./Components/NotesVideosDashboard";
+import About from "./Components/About";
+import Features from "./Components/Features";
+import Solutions from "./Components/Solutions";
+import Contact from "./Components/Contact";
 
 const App = () => {
     const navigate = useNavigate();
@@ -23,6 +27,7 @@ const App = () => {
     const [technicalStatus, setTechnicalStatus] = useState(false);
     const [programStatus, setProgramStatus] = useState(false);
     const [viewPerformance, setViewPerformance] = useState(false);
+    const[sem,setSem]=useState("");
 
     const [username, setUsername] = useState("");
     const [loginName, setloginName] = useState("");
@@ -40,11 +45,12 @@ const App = () => {
 
         if (role === "Student") {
             if (!aptiStatus) {
-
                 navigate("/aptitude-quiz");
-            } else if (!technicalStatus) {
+            } else if (!technicalStatus && parseInt(sem) > 3) {
+                // Only navigate to UnifiedDashboard if semester > 3
                 navigate("/Uni-dashboard");
             } else if (!programStatus) {
+                // Skip UnifiedDashboard for sem <= 3
                 navigate("/program-skill");
             } else if (!viewPerformance) {
                 navigate("/view-performance");
@@ -56,106 +62,124 @@ const App = () => {
         } else if (role === "Admin") {
             navigate("/student-list");
         }
-    }, [role, aptiStatus, technicalStatus, programStatus, viewPerformance, navigate]);
+    }, [role, aptiStatus, technicalStatus, programStatus, viewPerformance, navigate, sem]);
 
     return (
-        <div>            
-        <Routes>
-            <Route
-                path="/"
-                element={
-                    <Login
-                        setusn={setusn}
-                        setRole={setRole}
-                        setUsername={setUsername}
-                        setloginName={setloginName}
-                        setstdName={setstdName}
-                        setPucScore={setPucScore}
-                        setBe1Score={setBe1Score}
-                        setBe2Score={setBe2Score}
-                        setBe3Score={setBe3Score}
-                        setSSLCScore={setSSLCScore}
+        <div>
+            <Routes>
+                {/* Homepage Route */}
+                <Route path="/" element={<PlacementPlatformHomepage />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/features" element={<Features />} />
+                <Route path="/solutions" element={<Solutions />} />
+                <Route path="/contact" element={<Contact />} />
 
-                    />
-                    
-                }
-            />
-            
 
-            {role === "Student" && (
-                <>
-                    <Route
-                        path="/aptitude-quiz"
-                        element={
-                            <AptitudeQuiz
-                                usn={usn}
-                                setUsername={setUsername}
-                                setAptiStatus={setAptiStatus}
-                                stdname={stdname}
-                            />
-                        }
-                    />
-                    <Route
-                        path="/Uni-dashboard"
-                        element={
-                            <UnifiedDashboard
-                                loginName={loginName}
-                                setTechnicalStatus={setTechnicalStatus}
-                                stdname={stdname}
-                                usn={usn}
-                                setProgramStatus={setProgramStatus}
-                            />
-                        }
-                    />
-                    <Route
-                        path="/program-skill"
-                        element={<ProgramSkill setProgramStatus={setProgramStatus} usn={usn} />}
-                    />
-                    <Route
-                        path="/view-performance"
-                        element={<ViewPerformance setViewPerformance={setViewPerformance} usn={usn} />}
-                    />
-                    <Route
-                        path="/ai-placement"
-                        element={
-                            <AIPlacement
-                                stdname={stdname}
-                                loginName={loginName}
-                                sslcScore={sslcScore}
-                                pucScore={pucScore}
-                                be1Score={be1Score}
-                                be2Score={be2Score}
-                                be3Score={be3Score}
-                            />
-                        }
-                    />
-                    {/* Fallback for unmatched student routes */}
-                    <Route path="*" element={<Navigate to="/aptitude-quiz" />} />
-                </>
-            )}
 
-            {role === "Faculty" && (
-                <>
-                    <Route path="/add-student" element={<AddStudent />} />
-                    <Route path="/add-questions" element={<AddQuestion />} />
-                    <Route path="/student-list" element={<StudentList />} />
-                    <Route path="*" element={<Navigate to="/add-questions" />} />
-                </>
-            )}
+                {/* Login Page */}
+                <Route
+                    path="/login"
+                    element={
+                        <Login
+                            setusn={setusn}
+                            setRole={setRole}
+                            setUsername={setUsername}
+                            setloginName={setloginName}
+                            setstdName={setstdName}
+                            setPucScore={setPucScore}
+                            setBe1Score={setBe1Score}
+                            setBe2Score={setBe2Score}
+                            setBe3Score={setBe3Score}
+                            setSSLCScore={setSSLCScore}
+                            setSem={setSem}
+                        />
+                    }
+                />
 
-            {role === "Admin" && (
-                <>
-                    <Route path="/student-list" element={<StudentList />} />
-                    <Route path="*" element={<Navigate to="/student-list" />} />
-                </>
-            )}
+                {/* Student Routes */}
+                {role === "Student" && (
+                    <>
+                        <Route
+                            path="/aptitude-quiz"
+                            element={
+                                <AptitudeQuiz
+                                    usn={usn}
+                                    setUsername={setUsername}
+                                    setAptiStatus={setAptiStatus}
+                                    stdname={stdname}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/Uni-dashboard"
+                            element={
+                                <UnifiedDashboard
+                                    loginName={loginName}
+                                    setTechnicalStatus={setTechnicalStatus}
+                                    stdname={stdname}
+                                    usn={usn}
+                                    setProgramStatus={setProgramStatus}
+                                    sem={sem}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/program-skill"
+                            element={
+                                <ProgramSkill 
+                                    setProgramStatus={setProgramStatus} 
+                                    usn={usn} 
+                                    // For students with sem <= 3, set technical status to true when they complete program skills
+                                    setTechnicalStatus={parseInt(sem) <= 3 ? setTechnicalStatus : null}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/view-performance"
+                            element={<ViewPerformance setViewPerformance={setViewPerformance} usn={usn} />}
+                        />
+                        <Route
+                            path="/ai-placement"
+                            element={
+                                <AIPlacement
+                                    stdname={stdname}
+                                    loginName={loginName}
+                                    sslcScore={sslcScore}
+                                    pucScore={pucScore}
+                                    be1Score={be1Score}
+                                    be2Score={be2Score}
+                                    be3Score={be3Score}
+                                />
+                            }
+                        />
+                        <Route path="*" element={<Navigate to="/aptitude-quiz" />} />
+                    </>
+                )}
 
-            {/* Catch-all route for unauthenticated or invalid role */}
-            {role === null && <Route path="*" element={<Navigate to="/" />} />}
-        </Routes>
-        <NotesVideosDashboard></NotesVideosDashboard>
+                {/* Faculty Routes */}
+                {role === "Faculty" && (
+                    <>
+                        <Route path="/add-student" element={<AddStudent />} />
+                        <Route path="/add-questions" element={<AddQuestion />} />
+                        <Route path="/student-list" element={<StudentList />} />
+                        <Route path="*" element={<Navigate to="/add-questions" />} />
+                    </>
+                )}
+
+                {/* Admin Routes */}
+                {role === "Admin" && (
+                    <>
+                        <Route path="/student-list" element={<StudentList />} />
+                        <Route path="*" element={<Navigate to="/student-list" />} />
+                    </>
+                )}
+
+                {/* Fallback for unauthenticated users */}
+                {role === null && <Route path="*" element={<Navigate to="/" />} />}
+            </Routes>
+
+            {/* Static Notes Dashboard at bottom always visible */}
         </div>
-
     );
 };
 

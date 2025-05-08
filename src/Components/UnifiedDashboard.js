@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Book, Check, Clock, Award, X } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Route,BrowserRouter as Router,Routes } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import ProgramSkill from "./ProgramSkill";
 
-function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProgramStatus}) {
+function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus, setProgramStatus, sem }) {
   const navigate = useNavigate();
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [subjectData, setSubjectData] = useState({});
@@ -23,7 +23,8 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProg
   // Extract branch from loginName
   const stdBranch = loginName && loginName.length === 10 ? loginName.substring(5, 7).toLowerCase() : "cs";
 
-  const subjectsList = {
+  // Full subject lists by branch
+  const allSubjectsList = {
     cs: [
       { display: "Computer Networks", code: "CN" },
       { display: "Operating System", code: "OS" },
@@ -58,7 +59,38 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProg
     ]
   };
 
-  const subjects = subjectsList[stdBranch] || [];
+  // Subjects for lower semesters (4-5)
+  const lowerSemSubjectsList = {
+    cs: [
+      { display: "Data-Structure and Algorithm", code: "DSA" },
+      { display: "Operating System", code: "OS" },
+      { display: "Database Management System", code: "DB" },
+      { display: "Object-Oriented Programming", code: "OOPS" }
+    ],
+    ec: [
+      { display: "Database Management System", code: "DB" },
+      { display: "Object-Oriented Programming", code: "OOPS" },
+      { display: "Operating System", code: "OS" },
+      { display: "Electronic Circuits", code: "EC" }
+    ],
+    cv: [
+      { display: "Basics of Civil Engineering", code: "CE" },
+      { display: "Structural Engineering", code: "SE" },
+      { display: "Strength of Materials", code: "SM" },
+      { display: "CAED", code: "CAED" }
+    ],
+    me: [
+      { display: "Basics of Mechanical Engineering", code: "ME" },
+      { display: "Thermodynamics", code: "TD" },
+      { display: "Theory of Machines", code: "TM" },
+      { display: "CAED", code: "CAED" }
+    ]
+  };
+
+  // Determine which subject list to use based on semester
+  const subjects = sem && (sem === 4 || sem === 5) 
+    ? (lowerSemSubjectsList[stdBranch] || [])
+    : (allSubjectsList[stdBranch] || []);
 
   // Load subject data on component mount
   useEffect(() => {
@@ -311,6 +343,7 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProg
             <div className="flex items-center">
               <Book className="text-blue-600 mr-2" size={24} />
               <h1 className="text-lg font-bold text-gray-800">Technical Assessment</h1>
+              {sem && <span className="ml-2 text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Semester {sem}</span>}
             </div>
             <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
               {loginName ? loginName.toUpperCase() : 'STUDENT'} • {stdname || 'User'}
@@ -592,13 +625,14 @@ function UnifiedDashboard({ loginName, stdname, usn, setTechnicalStatus ,setProg
           </div>
         </div>
       )}
+      <Routes>
+        <Route
+          path="/program-skill"
+          element={<ProgramSkill setProgramStatus={setProgramStatus} usn={usn} />}
+        />
+      </Routes>
     </div>
   );
-  <Routes>
-  <Route
-                        path="/program-skill"
-                        element={<ProgramSkill setProgramStatus={setProgramStatus} usn={usn} />}
-                    /></Routes>
 }
 
 export default UnifiedDashboard;

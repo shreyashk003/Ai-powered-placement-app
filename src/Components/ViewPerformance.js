@@ -82,12 +82,56 @@ function ViewPerformance({ setViewPerformance, usn }) {
     ? (studentData.reduce((sum, item) => sum + (item.timeInSeconds || 0), 0) / completedAttempts).toFixed(0)
     : 0;
 
-  const chartData = studentData.map(item => ({
-    name: item.sub_name || 'Unknown',
-    score: item.score || 0,
-    timeInSeconds: item.timeInSeconds || 0,
-    date: item.quiz_date
-  }));
+  // Process data to include attempt numbers for each subject
+  const subjectAttempts = {};
+  const processedChartData = studentData.map(item => {
+    const subName = item.sub_name || 'Unknown';
+    
+    // Initialize or increment attempt counter for this subject
+    if (!subjectAttempts[subName]) {
+      subjectAttempts[subName] = 1;
+    } else {
+      subjectAttempts[subName]++;
+    }
+    
+    const attemptNumber = subjectAttempts[subName];
+    
+    return {
+      name: `${subName}-${attemptNumber}`, // Combined subject-attempt label
+      subject: subName, // Original subject name
+      attemptNum: attemptNumber, // Attempt number
+      score: item.score || 0,
+      timeInSeconds: item.timeInSeconds || 0,
+      date: item.quiz_date
+    };
+  });
+
+  // Generate colors based on subject and attempt
+  const generateBarColors = () => {
+    // Define distinct colors for each attempt (1st, 2nd, and 3rd attempts)
+    const attemptColors = {
+      1: '#4F46E5', // Deep blue for first attempts
+      2: '#10B981', // Green for second attempts
+      3: '#F59E0B'  // Amber/orange for third attempts
+    };
+    
+    // For any attempt beyond 3, we'll use additional colors
+    const extraAttemptColors = ['#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+    
+    return processedChartData.map(item => {
+      const attemptNum = item.attemptNum;
+      
+      if (attemptNum <= 3) {
+        // Use our predefined colors for attempts 1-3
+        return attemptColors[attemptNum];
+      } else {
+        // For attempts beyond 3, use colors from our extra list
+        return extraAttemptColors[(attemptNum - 4) % extraAttemptColors.length];
+      }
+    });
+  };
+  
+  const barColors = generateBarColors();
 
   // Data for pie chart - score distribution
   const scoreRanges = [
@@ -306,13 +350,23 @@ function ViewPerformance({ setViewPerformance, usn }) {
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
+                    <BarChart data={processedChartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                       <YAxis tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{ fill: '#f9fafb' }} />
+                      <Tooltip 
+                        cursor={{ fill: '#f9fafb' }}
+                        formatter={(value, name, props) => {
+                          return [`${value}`, name === "score" ? "Score" : "Time (seconds)"];
+                        }}
+                        labelFormatter={(label) => `${label}`}
+                      />
                       <Legend />
-                      <Bar dataKey="score" name="Score" fill="#4F46E5" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="score" name="Score">
+                        {processedChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={barColors[index]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -348,18 +402,26 @@ function ViewPerformance({ setViewPerformance, usn }) {
                 </div>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
+                    <BarChart data={processedChartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                       <YAxis tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{ fill: '#f9fafb' }} />
+                      <Tooltip 
+                        cursor={{ fill: '#f9fafb' }}
+                        formatter={(value, name, props) => {
+                          return [`${value}`, name === "score" ? "Score" : "Time (seconds)"];
+                        }}
+                        labelFormatter={(label) => `${label}`}
+                      />
                       <Legend />
                       <Bar
                         dataKey={selectedMetric}
                         name={selectedMetric === 'score' ? 'Score' : 'Time (seconds)'}
-                        fill={selectedMetric === 'score' ? '#4F46E5' : '#10B981'}
-                        radius={[4, 4, 0, 0]}
-                      />
+                      >
+                        {processedChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={barColors[index]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -373,11 +435,17 @@ function ViewPerformance({ setViewPerformance, usn }) {
                 </div>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
+                    <LineChart data={processedChartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                       <YAxis tickLine={false} axisLine={false} />
-                      <Tooltip cursor={{ fill: '#f9fafb' }} />
+                      <Tooltip 
+                        cursor={{ fill: '#f9fafb' }}
+                        formatter={(value, name, props) => {
+                          return [`${value}`, name === "score" ? "Score" : "Time (seconds)"];
+                        }}
+                        labelFormatter={(label) => `${label}`}
+                      />
                       <Legend />
                       <Line
                         type="monotone"
@@ -406,6 +474,7 @@ function ViewPerformance({ setViewPerformance, usn }) {
                 <thead className="bg-slate-50 text-slate-700">
                   <tr>
                     <th className="px-6 py-3 font-semibold">Subject</th>
+                    <th className="px-6 py-3 font-semibold">Attempt</th>
                     <th className="px-6 py-3 font-semibold">Score</th>
                     <th className="px-6 py-3 font-semibold">Time Taken</th>
                     <th className="px-6 py-3 font-semibold">Date</th>
@@ -413,12 +482,13 @@ function ViewPerformance({ setViewPerformance, usn }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {studentData.map((item, index) => (
+                  {processedChartData.map((item, index) => (
                     <tr key={index} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-6 py-4 font-medium text-slate-800">{item.sub_name || 'Unknown'}</td>
-                      <td className="px-6 py-4">{item.score || 0}</td>
+                      <td className="px-6 py-4 font-medium text-slate-800">{item.subject}</td>
+                      <td className="px-6 py-4">{item.attemptNum}</td>
+                      <td className="px-6 py-4">{item.score}</td>
                       <td className="px-6 py-4">{item.timeInSeconds} seconds</td>
-                      <td className="px-6 py-4">{item.quiz_date || 'N/A'}</td>
+                      <td className="px-6 py-4">{item.date || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           item.score >= 80 ? 'bg-green-100 text-green-800' :
